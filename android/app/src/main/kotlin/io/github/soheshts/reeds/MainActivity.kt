@@ -1,4 +1,4 @@
-package com.example.reeds
+package io.github.soheshts.reeds
 
 import io.flutter.embedding.android.FlutterActivity
 

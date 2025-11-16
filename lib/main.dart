@@ -130,13 +130,13 @@ class _FeedHomePageState extends State<FeedHomePage> {
   bool isLoading = true;
   bool isRefreshing = false;
   Set<String> expandedCategories = {};
-  
+
   String? selectedCategory;
   String? selectedFeedSource;
-  
+
   final ScrollController _homeScrollController = ScrollController();
   final ScrollController _savedScrollController = ScrollController();
-  
+
   int _loadedFeedsCount = 0;
   int _totalFeedsToLoad = 0;
 
@@ -174,11 +174,13 @@ class _FeedHomePageState extends State<FeedHomePage> {
 
         data.forEach((category, feeds) {
           for (var feed in feeds as List) {
-            sources.add(FeedSource(
-              name: feed['name'],
-              url: feed['url'],
-              category: category,
-            ));
+            sources.add(
+              FeedSource(
+                name: feed['name'],
+                url: feed['url'],
+                category: category,
+              ),
+            );
           }
         });
 
@@ -188,7 +190,7 @@ class _FeedHomePageState extends State<FeedHomePage> {
         });
 
         await loadSelectedSources();
-        
+
         if (selectedSourceUrls.isEmpty && sources.isNotEmpty) {
           setState(() {
             selectedSourceUrls = {
@@ -220,7 +222,7 @@ class _FeedHomePageState extends State<FeedHomePage> {
           category: 'custom',
         );
       }).toList();
-      
+
       setState(() => allFeedSources.addAll(customSources));
     }
   }
@@ -270,11 +272,15 @@ class _FeedHomePageState extends State<FeedHomePage> {
         (source) => source.url == url && source.category == 'custom',
       );
       selectedSourceUrls.remove(url);
-      _feedItems.removeWhere((item) => 
-        allFeedSources.firstWhere(
-          (s) => s.name == item.feedSource,
-          orElse: () => FeedSource(name: '', url: url, category: ''),
-        ).url == url
+      _feedItems.removeWhere(
+        (item) =>
+            allFeedSources
+                .firstWhere(
+                  (s) => s.name == item.feedSource,
+                  orElse: () => FeedSource(name: '', url: url, category: ''),
+                )
+                .url ==
+            url,
       );
     });
 
@@ -310,7 +316,7 @@ class _FeedHomePageState extends State<FeedHomePage> {
 
   Future<void> saveFeedItem(FeedItem item) async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     setState(() {
       if (savedItems.any((saved) => saved.id == item.id)) {
         savedItems.removeWhere((saved) => saved.id == item.id);
@@ -319,11 +325,14 @@ class _FeedHomePageState extends State<FeedHomePage> {
       }
     });
 
-    final savedJson = savedItems.map((item) => jsonEncode(item.toJson())).toList();
+    final savedJson = savedItems
+        .map((item) => jsonEncode(item.toJson()))
+        .toList();
     await prefs.setStringList('saved_items', savedJson);
   }
 
-  bool isItemSaved(String itemId) => savedItems.any((item) => item.id == itemId);
+  bool isItemSaved(String itemId) =>
+      savedItems.any((item) => item.id == itemId);
 
   // Feed Loading
   Future<void> loadFeedsProgressively() async {
@@ -338,7 +347,7 @@ class _FeedHomePageState extends State<FeedHomePage> {
 
     for (var url in selectedSourceUrls) {
       if (!mounted) break;
-      
+
       try {
         final feedData = await fetchAndParseFeed(url);
         if (mounted) {
@@ -364,18 +373,22 @@ class _FeedHomePageState extends State<FeedHomePage> {
 
   Future<List<FeedItem>> fetchAndParseFeed(String url) async {
     try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
-          'Accept-Encoding': 'gzip, deflate',
-        },
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => throw TimeoutException('Feed request timeout'),
-      );
-      
+      final response = await http
+          .get(
+            Uri.parse(url),
+            headers: {
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept':
+                  'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+              'Accept-Encoding': 'gzip, deflate',
+            },
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw TimeoutException('Feed request timeout'),
+          );
+
       if (response.statusCode == 200) {
         String feedContent;
         try {
@@ -383,10 +396,10 @@ class _FeedHomePageState extends State<FeedHomePage> {
         } catch (e) {
           feedContent = response.body;
         }
-        
+
         // Clean up any potential XML issues
         feedContent = feedContent.trim();
-        
+
         try {
           return parseRssFeed(RssFeed.parse(feedContent), url);
         } catch (rssError) {
@@ -419,25 +432,42 @@ class _FeedHomePageState extends State<FeedHomePage> {
     );
 
     return feed.items?.map((item) {
-      String? imageUrl = item.media?.contents?.firstOrNull?.url ??
-          item.media?.thumbnails?.firstOrNull?.url ??
-          (item.enclosure?.type?.startsWith('image') == true ? item.enclosure!.url : null) ??
-          item.content?.images?.firstOrNull ??
-          _extractImageFromHtml(item.description ?? '') ??
-          _extractImageFromHtml(item.content?.value ?? '');
+          String? imageUrl =
+              item.media?.contents?.firstOrNull?.url ??
+              item.media?.thumbnails?.firstOrNull?.url ??
+              (item.enclosure?.type?.startsWith('image') == true
+                  ? item.enclosure!.url
+                  : null) ??
+              item.content?.images?.firstOrNull ??
+              _extractImageFromHtml(item.description ?? '') ??
+              _extractImageFromHtml(item.content?.value ?? '');
 
-      return FeedItem(
-        id: item.guid ?? item.link ?? '${feedUrl}_${DateTime.now().millisecondsSinceEpoch}',
-        feedSource: feedSource.name,
-        feedSourceImage: feed.image?.url ?? '',
-        title: item.title ?? 'Untitled',
-        description: _stripHtmlTags(item.description ?? ''),
-        author: item.author ?? item.dc?.creator ?? feedSource.name,
-        date: _parseDateTime(item.pubDate),
-        link: item.link ?? '',
-        image: imageUrl,
-      );
-    }).toList() ?? [];
+          // Clean and normalize all text fields
+          final author = (item.author ?? item.dc?.creator ?? feedSource.name)
+              .trim()
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .replaceAll(RegExp(r'[\n\r\t]'), ' ');
+
+          return FeedItem(
+            id:
+                (item.guid ??
+                        item.link ??
+                        '${feedUrl}_${DateTime.now().millisecondsSinceEpoch}')
+                    .trim(),
+            feedSource: feedSource.name.trim(),
+            feedSourceImage: (feed.image?.url ?? '').trim(),
+            title: (item.title ?? 'Untitled').trim().replaceAll(
+              RegExp(r'\s+'),
+              ' ',
+            ),
+            description: _stripHtmlTags(item.description ?? ''),
+            author: author,
+            date: _parseDateTime(item.pubDate),
+            link: (item.link ?? '').trim(),
+            image: imageUrl?.trim(),
+          );
+        }).toList() ??
+        [];
   }
 
   List<FeedItem> parseAtomFeed(AtomFeed feed, String feedUrl) {
@@ -447,57 +477,84 @@ class _FeedHomePageState extends State<FeedHomePage> {
     );
 
     return feed.items?.map((item) {
-      final imageLinks = item.links?.where((l) => 
-        l.rel == 'enclosure' && l.type?.startsWith('image') == true
-      );
-      
-      String? imageUrl = imageLinks?.firstOrNull?.href ??
-          _extractImageFromHtml(item.summary ?? '') ??
-          _extractImageFromHtml(item.content ?? '');
+          final imageLinks = item.links?.where(
+            (l) => l.rel == 'enclosure' && l.type?.startsWith('image') == true,
+          );
 
-      DateTime itemDate = DateTime.now();
-      try {
-        if (item.published is String) {
-          itemDate = DateTime.parse(item.published as String);
-        } else if (item.published is DateTime) {
-          itemDate = item.published as DateTime;
-        } else if (item.updated is String) {
-          itemDate = DateTime.parse(item.updated as String);
-        } else if (item.updated is DateTime) {
-          itemDate = item.updated as DateTime;
-        }
-        itemDate = _parseDateTime(itemDate);
-      } catch (e) {
-        itemDate = DateTime.now();
-      }
+          String? imageUrl =
+              imageLinks?.firstOrNull?.href ??
+              _extractImageFromHtml(item.summary ?? '') ??
+              _extractImageFromHtml(item.content ?? '');
 
-      return FeedItem(
-        id: item.id ?? '${feedUrl}_${DateTime.now().millisecondsSinceEpoch}',
-        feedSource: feedSource.name,
-        feedSourceImage: feed.icon ?? feed.logo ?? '',
-        title: item.title ?? 'Untitled',
-        description: _stripHtmlTags(item.summary ?? item.content ?? ''),
-        author: item.authors?.firstOrNull?.name ?? feedSource.name,
-        date: itemDate,
-        link: item.links?.firstOrNull?.href ?? '',
-        image: imageUrl,
-      );
-    }).toList() ?? [];
+          DateTime itemDate = DateTime.now();
+          try {
+            if (item.published is String) {
+              itemDate = DateTime.parse(item.published as String);
+            } else if (item.published is DateTime) {
+              itemDate = item.published as DateTime;
+            } else if (item.updated is String) {
+              itemDate = DateTime.parse(item.updated as String);
+            } else if (item.updated is DateTime) {
+              itemDate = item.updated as DateTime;
+            }
+            itemDate = _parseDateTime(itemDate);
+          } catch (e) {
+            itemDate = DateTime.now();
+          }
+
+          // Clean and normalize all text fields
+          final author = (item.authors?.firstOrNull?.name ?? feedSource.name)
+              .trim()
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .replaceAll(RegExp(r'[\n\r\t]'), ' ');
+
+          return FeedItem(
+            id:
+                (item.id ??
+                        '${feedUrl}_${DateTime.now().millisecondsSinceEpoch}')
+                    .trim(),
+            feedSource: feedSource.name.trim(),
+            feedSourceImage: (feed.icon ?? feed.logo ?? '').trim(),
+            title: (item.title ?? 'Untitled').trim().replaceAll(
+              RegExp(r'\s+'),
+              ' ',
+            ),
+            description: _stripHtmlTags(item.summary ?? item.content ?? ''),
+            author: author,
+            date: itemDate,
+            link: (item.links?.firstOrNull?.href ?? '').trim(),
+            image: imageUrl?.trim(),
+          );
+        }).toList() ??
+        [];
   }
 
   String _stripHtmlTags(String html) {
-    return html.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+    if (html.isEmpty) return '';
+    // Remove HTML tags, decode entities, normalize whitespace
+    return html
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   String? _extractImageFromHtml(String html) {
     if (html.isEmpty) return null;
-    
+
     final patterns = [
       RegExp(r'<img[^>]+src="([^">]+)"', caseSensitive: false),
       RegExp(r"<img[^>]+src='([^'>]+)'", caseSensitive: false),
-      RegExp(r'<meta[^>]+property="og:image"[^>]+content="([^">]+)"', caseSensitive: false),
+      RegExp(
+        r'<meta[^>]+property="og:image"[^>]+content="([^">]+)"',
+        caseSensitive: false,
+      ),
     ];
-    
+
     for (var pattern in patterns) {
       final match = pattern.firstMatch(html);
       if (match != null && match.group(1) != null) {
@@ -515,12 +572,12 @@ class _FeedHomePageState extends State<FeedHomePage> {
       final uri = Uri.parse(url);
       final path = uri.path.toLowerCase();
       // Check for common image extensions
-      return path.endsWith('.jpg') || 
-             path.endsWith('.jpeg') || 
-             path.endsWith('.png') || 
-             path.endsWith('.gif') || 
-             path.endsWith('.webp') ||
-             url.contains('image');
+      return path.endsWith('.jpg') ||
+          path.endsWith('.jpeg') ||
+          path.endsWith('.png') ||
+          path.endsWith('.gif') ||
+          path.endsWith('.webp') ||
+          url.contains('image');
     } catch (e) {
       return false;
     }
@@ -552,9 +609,9 @@ class _FeedHomePageState extends State<FeedHomePage> {
 
   void _showSnackBar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -602,7 +659,10 @@ class _FeedHomePageState extends State<FeedHomePage> {
                 return;
               }
               Navigator.pop(context);
-              addCustomSource(nameController.text.trim(), urlController.text.trim());
+              addCustomSource(
+                nameController.text.trim(),
+                urlController.text.trim(),
+              );
             },
             child: const Text('Add'),
           ),
@@ -615,7 +675,8 @@ class _FeedHomePageState extends State<FeedHomePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => WebViewPage(url: url, title: title, feedSource: feedSource),
+        builder: (context) =>
+            WebViewPage(url: url, title: title, feedSource: feedSource),
       ),
     );
   }
@@ -642,11 +703,15 @@ class _FeedHomePageState extends State<FeedHomePage> {
           .where((s) => s.category == selectedCategory)
           .map((s) => s.name)
           .toSet();
-      filtered = filtered.where((item) => categoryFeeds.contains(item.feedSource)).toList();
+      filtered = filtered
+          .where((item) => categoryFeeds.contains(item.feedSource))
+          .toList();
     }
 
     if (selectedFeedSource != null) {
-      filtered = filtered.where((item) => item.feedSource == selectedFeedSource).toList();
+      filtered = filtered
+          .where((item) => item.feedSource == selectedFeedSource)
+          .toList();
     }
 
     return filtered;
@@ -672,7 +737,11 @@ class _FeedHomePageState extends State<FeedHomePage> {
       selectedCategory = null;
     });
     if (_homeScrollController.hasClients) {
-      _homeScrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      _homeScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -681,7 +750,9 @@ class _FeedHomePageState extends State<FeedHomePage> {
     final displayItems = filteredFeedItems;
 
     if (_feedItems.isEmpty && isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFFF9500)));
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFFF9500)),
+      );
     }
 
     if (_feedItems.isEmpty && isRefreshing) {
@@ -712,13 +783,17 @@ class _FeedHomePageState extends State<FeedHomePage> {
 
     return Column(
       children: [
-        if (availableCategories.isNotEmpty) _buildFilterChips(displayItems.length),
+        if (availableCategories.isNotEmpty)
+          _buildFilterChips(displayItems.length),
         if (selectedFeedSource != null) _buildActiveFilterBar(),
         if (isRefreshing && _feedItems.isNotEmpty) _buildLoadingBar(),
         Expanded(
           child: displayItems.isEmpty && _feedItems.isNotEmpty
               ? const Center(
-                  child: Text('No feeds in this filter', style: TextStyle(color: Color(0xFF666666))),
+                  child: Text(
+                    'No feeds in this filter',
+                    style: TextStyle(color: Color(0xFF666666)),
+                  ),
                 )
               : RefreshIndicator(
                   onRefresh: loadFeedsProgressively,
@@ -726,6 +801,7 @@ class _FeedHomePageState extends State<FeedHomePage> {
                   child: ListView.separated(
                     controller: _homeScrollController,
                     itemCount: displayItems.length,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     separatorBuilder: (context, index) => const Divider(
                       height: 1,
                       thickness: 0.3,
@@ -739,10 +815,14 @@ class _FeedHomePageState extends State<FeedHomePage> {
                         formatDate: formatDate,
                         isSaved: isItemSaved(item.id),
                         onSave: () => saveFeedItem(item),
-                        onOpen: () => openWebView(item.link, item.title, item.feedSource),
+                        onOpen: () =>
+                            openWebView(item.link, item.title, item.feedSource),
                         onShare: () => shareItem(item),
-                        onImageTap: item.image != null ? () => openImageViewer(item.image!) : null,
-                        onFeedSourceTap: () => filterByFeedSource(item.feedSource),
+                        onImageTap: item.image != null
+                            ? () => openImageViewer(item.image!)
+                            : null,
+                        onFeedSourceTap: () =>
+                            filterByFeedSource(item.feedSource),
                       );
                     },
                   ),
@@ -754,31 +834,46 @@ class _FeedHomePageState extends State<FeedHomePage> {
 
   Widget _buildFilterChips(int totalCount) {
     return Container(
-      height: 50,
+      height: 52,
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFF2A2A2A), width: 0.3)),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFF2A2A2A), width: 0.3),
+        ),
       ),
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         children: [
-          _buildChip('All', totalCount, selectedCategory == null && selectedFeedSource == null, () => clearFilters()),
+          _buildChip(
+            'All',
+            totalCount,
+            selectedCategory == null && selectedFeedSource == null,
+            () => clearFilters(),
+          ),
           ...availableCategories.map((category) {
             final count = _feedItems.where((item) {
               final categoryFeeds = allFeedSources
-                  .where((s) => s.category == category && selectedSourceUrls.contains(s.url))
+                  .where(
+                    (s) =>
+                        s.category == category &&
+                        selectedSourceUrls.contains(s.url),
+                  )
                   .map((s) => s.name)
                   .toSet();
               return categoryFeeds.contains(item.feedSource);
             }).length;
-            
+
             return _buildChip(
-              category == 'custom' ? 'Custom' : category[0].toUpperCase() + category.substring(1),
+              category == 'custom'
+                  ? 'Custom'
+                  : category[0].toUpperCase() + category.substring(1),
               count,
               selectedCategory == category,
               () {
                 setState(() {
-                  selectedCategory = selectedCategory == category ? null : category;
+                  selectedCategory = selectedCategory == category
+                      ? null
+                      : category;
                   selectedFeedSource = null;
                 });
               },
@@ -789,27 +884,37 @@ class _FeedHomePageState extends State<FeedHomePage> {
     );
   }
 
-  Widget _buildChip(String label, int count, bool isSelected, VoidCallback onTap) {
+  Widget _buildChip(
+    String label,
+    int count,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             color: isSelected ? const Color(0xFFFF9500) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? const Color(0xFFFF9500) : const Color(0xFF2A2A2A),
+              color: isSelected
+                  ? const Color(0xFFFF9500)
+                  : const Color(0xFF2A2A2A),
               width: 1,
             ),
           ),
-          child: Text(
-            '$label ($count)',
-            style: TextStyle(
-              color: isSelected ? Colors.black : Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+          child: Center(
+            child: Text(
+              '$label ($count)',
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.2,
+              ),
             ),
           ),
         ),
@@ -821,7 +926,9 @@ class _FeedHomePageState extends State<FeedHomePage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFF2A2A2A), width: 0.3)),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFF2A2A2A), width: 0.3),
+        ),
       ),
       child: Row(
         children: [
@@ -836,7 +943,10 @@ class _FeedHomePageState extends State<FeedHomePage> {
           ),
           GestureDetector(
             onTap: clearFilters,
-            child: const Text('Clear', style: TextStyle(color: Color(0xFFFF9500), fontSize: 13)),
+            child: const Text(
+              'Clear',
+              style: TextStyle(color: Color(0xFFFF9500), fontSize: 13),
+            ),
           ),
         ],
       ),
@@ -847,7 +957,9 @@ class _FeedHomePageState extends State<FeedHomePage> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFF2A2A2A), width: 0.3)),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFF2A2A2A), width: 0.3),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -855,7 +967,10 @@ class _FeedHomePageState extends State<FeedHomePage> {
           const SizedBox(
             width: 14,
             height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF9500)),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFFFF9500),
+            ),
           ),
           const SizedBox(width: 10),
           Text(
@@ -881,11 +996,9 @@ class _FeedHomePageState extends State<FeedHomePage> {
     return ListView.separated(
       controller: _savedScrollController,
       itemCount: savedItems.length,
-      separatorBuilder: (context, index) => const Divider(
-        height: 1,
-        thickness: 0.3,
-        color: Color(0xFF2A2A2A),
-      ),
+      physics: const AlwaysScrollableScrollPhysics(),
+      separatorBuilder: (context, index) =>
+          const Divider(height: 1, thickness: 0.3, color: Color(0xFF2A2A2A)),
       itemBuilder: (context, index) {
         final item = savedItems[index];
         return FeedItemWidget(
@@ -896,7 +1009,9 @@ class _FeedHomePageState extends State<FeedHomePage> {
           onSave: () => saveFeedItem(item),
           onOpen: () => openWebView(item.link, item.title, item.feedSource),
           onShare: () => shareItem(item),
-          onImageTap: item.image != null ? () => openImageViewer(item.image!) : null,
+          onImageTap: item.image != null
+              ? () => openImageViewer(item.image!)
+              : null,
           onFeedSourceTap: null,
         );
       },
@@ -910,7 +1025,13 @@ class _FeedHomePageState extends State<FeedHomePage> {
     }
 
     final sortedCategories = categorizedFeeds.keys.toList()
-      ..sort((a, b) => a == 'custom' ? -1 : b == 'custom' ? 1 : a.compareTo(b));
+      ..sort(
+        (a, b) => a == 'custom'
+            ? -1
+            : b == 'custom'
+            ? 1
+            : a.compareTo(b),
+      );
 
     return Column(
       children: [
@@ -924,9 +1045,14 @@ class _FeedHomePageState extends State<FeedHomePage> {
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: const Text('Add Custom Feed', style: TextStyle(fontWeight: FontWeight.w600)),
+              child: const Text(
+                'Add Custom Feed',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         ),
@@ -938,32 +1064,49 @@ class _FeedHomePageState extends State<FeedHomePage> {
               final categoryKey = sortedCategories[catIndex];
               final sources = categorizedFeeds[categoryKey]!;
               final isExpanded = expandedCategories.contains(categoryKey);
-              final selectedCount = sources.where((s) => selectedSourceUrls.contains(s.url)).length;
-              
+              final selectedCount = sources
+                  .where((s) => selectedSourceUrls.contains(s.url))
+                  .length;
+
               return Column(
                 children: [
                   ListTile(
                     title: Row(
                       children: [
                         Text(
-                          categoryKey == 'custom' ? 'CUSTOM' : categoryKey.toUpperCase(),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                          categoryKey == 'custom'
+                              ? 'CUSTOM'
+                              : categoryKey.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF2A2A2A),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
                             '$selectedCount/${sources.length}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF666666),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    trailing: Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 20),
+                    trailing: Icon(
+                      isExpanded ? Icons.expand_less : Icons.expand_more,
+                      size: 20,
+                    ),
                     onTap: () {
                       setState(() {
                         if (isExpanded) {
@@ -976,15 +1119,26 @@ class _FeedHomePageState extends State<FeedHomePage> {
                   ),
                   if (isExpanded)
                     ...sources.map((source) {
-                      final isSelected = selectedSourceUrls.contains(source.url);
+                      final isSelected = selectedSourceUrls.contains(
+                        source.url,
+                      );
                       final isCustom = source.category == 'custom';
-                      
+
                       return ListTile(
-                        contentPadding: const EdgeInsets.only(left: 32, right: 16),
-                        title: Text(source.name, style: const TextStyle(fontSize: 14)),
+                        contentPadding: const EdgeInsets.only(
+                          left: 32,
+                          right: 16,
+                        ),
+                        title: Text(
+                          source.name,
+                          style: const TextStyle(fontSize: 14),
+                        ),
                         subtitle: Text(
                           source.url,
-                          style: const TextStyle(color: Color(0xFF666666), fontSize: 11),
+                          style: const TextStyle(
+                            color: Color(0xFF666666),
+                            fontSize: 11,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -998,7 +1152,11 @@ class _FeedHomePageState extends State<FeedHomePage> {
                             ),
                             if (isCustom)
                               IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
                                 onPressed: () => _showDeleteDialog(source),
                               ),
                           ],
@@ -1006,7 +1164,11 @@ class _FeedHomePageState extends State<FeedHomePage> {
                         onTap: () => toggleSource(source.url),
                       );
                     }),
-                  const Divider(height: 1, thickness: 0.3, color: Color(0xFF2A2A2A)),
+                  const Divider(
+                    height: 1,
+                    thickness: 0.3,
+                    color: Color(0xFF2A2A2A),
+                  ),
                 ],
               );
             },
@@ -1046,8 +1208,16 @@ class _FeedHomePageState extends State<FeedHomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _currentIndex == 0 ? 'Reeds' : _currentIndex == 1 ? 'Saved' : 'Sources',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 28, color: Color(0xFFFF9500)),
+          _currentIndex == 0
+              ? 'Reeds'
+              : _currentIndex == 1
+              ? 'Saved'
+              : 'Sources',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 28,
+            color: Color(0xFFFF9500),
+          ),
         ),
         actions: _currentIndex == 0
             ? [
@@ -1070,18 +1240,36 @@ class _FeedHomePageState extends State<FeedHomePage> {
           currentIndex: _currentIndex,
           onTap: (index) {
             if (index == _currentIndex && (index == 0 || index == 1)) {
-              final controller = index == 0 ? _homeScrollController : _savedScrollController;
+              final controller = index == 0
+                  ? _homeScrollController
+                  : _savedScrollController;
               if (controller.hasClients) {
-                controller.animateTo(0, duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic);
+                controller.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeOutCubic,
+                );
               }
             } else {
               setState(() => _currentIndex = index);
             }
           },
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.favorite_outline), activeIcon: Icon(Icons.favorite), label: 'Saved'),
-            BottomNavigationBarItem(icon: Icon(Icons.rss_feed_outlined), activeIcon: Icon(Icons.rss_feed), label: 'Sources'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.favorite_outline),
+              activeIcon: Icon(Icons.favorite),
+              label: 'Saved',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.rss_feed_outlined),
+              activeIcon: Icon(Icons.rss_feed),
+              label: 'Sources',
+            ),
           ],
         ),
       ),
@@ -1143,9 +1331,11 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
                             fit: BoxFit.cover,
                             placeholder: (_, __) => _buildAvatarFallback(),
                             errorWidget: (_, __, ___) => _buildAvatarFallback(),
-                            fadeInDuration: const Duration(milliseconds: 200),
+                            fadeInDuration: const Duration(milliseconds: 150),
                             memCacheWidth: 72,
                             memCacheHeight: 72,
+                            maxHeightDiskCache: 72,
+                            maxWidthDiskCache: 72,
                           ),
                         )
                       : _buildAvatarFallback(),
@@ -1160,7 +1350,10 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
                     children: [
                       Text(
                         widget.item.feedSource,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       Row(
@@ -1168,13 +1361,20 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
                           Flexible(
                             child: Text(
                               widget.item.author,
-                              style: const TextStyle(color: Color(0xFF666666), fontSize: 13),
+                              style: const TextStyle(
+                                color: Color(0xFF666666),
+                                fontSize: 13,
+                              ),
                               overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ),
                           Text(
                             ' · ${widget.formatDate(widget.item.date)}',
-                            style: const TextStyle(color: Color(0xFF666666), fontSize: 13),
+                            style: const TextStyle(
+                              color: Color(0xFF666666),
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -1185,7 +1385,7 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Content
           GestureDetector(
             onTap: widget.onOpen,
@@ -1194,15 +1394,25 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
               children: [
                 Text(
                   widget.item.title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, height: 1.4),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
                 ),
                 if (widget.item.description.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
                     widget.item.description,
-                    style: const TextStyle(color: Color(0xFFCCCCCC), fontSize: 15, height: 1.5),
+                    style: const TextStyle(
+                      color: Color(0xFFCCCCCC),
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
                     maxLines: _isExpanded ? null : 3,
-                    overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                    overflow: _isExpanded
+                        ? TextOverflow.visible
+                        : TextOverflow.ellipsis,
                   ),
                   if (widget.item.description.length > 150)
                     GestureDetector(
@@ -1211,7 +1421,10 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           _isExpanded ? 'Show less' : 'Read more',
-                          style: const TextStyle(color: Color(0xFF666666), fontSize: 14),
+                          style: const TextStyle(
+                            color: Color(0xFF666666),
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
@@ -1219,7 +1432,7 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
               ],
             ),
           ),
-          
+
           // Image
           if (widget.item.image != null && widget.item.image!.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -1242,16 +1455,16 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
                     ),
                   ),
                   errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                  fadeInDuration: const Duration(milliseconds: 300),
-                  maxHeightDiskCache: 800,
-                  maxWidthDiskCache: 800,
+                  fadeInDuration: const Duration(milliseconds: 200),
+                  maxHeightDiskCache: 600,
+                  maxWidthDiskCache: 600,
                 ),
               ),
             ),
           ],
-          
+
           const SizedBox(height: 16),
-          
+
           // Action Buttons - Segmented style
           Container(
             height: 42,
@@ -1263,8 +1476,12 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
               children: [
                 Expanded(
                   child: _ActionButton(
-                    icon: widget.isSaved ? Icons.favorite : Icons.favorite_outline,
-                    color: widget.isSaved ? Colors.red : const Color(0xFF666666),
+                    icon: widget.isSaved
+                        ? Icons.favorite
+                        : Icons.favorite_outline,
+                    color: widget.isSaved
+                        ? Colors.red
+                        : const Color(0xFF666666),
                     onTap: widget.onSave,
                   ),
                 ),
@@ -1296,15 +1513,17 @@ class _FeedItemWidgetState extends State<FeedItemWidget> {
     return Container(
       width: 36,
       height: 36,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-        ),
-      ),
+      color: const Color(0xFF666666),
       child: Center(
         child: Text(
-          widget.item.feedSource.isNotEmpty ? widget.item.feedSource[0].toUpperCase() : '?',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          widget.item.feedSource.isNotEmpty
+              ? widget.item.feedSource[0].toUpperCase()
+              : '?',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Colors.white,
+          ),
         ),
       ),
     );
@@ -1316,16 +1535,18 @@ class _ActionButton extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _ActionButton({required this.icon, required this.color, required this.onTap});
+  const _ActionButton({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      child: Center(
-        child: Icon(icon, size: 20, color: color),
-      ),
+      child: Center(child: Icon(icon, size: 20, color: color)),
     );
   }
 }
@@ -1336,7 +1557,12 @@ class WebViewPage extends StatefulWidget {
   final String title;
   final String feedSource;
 
-  const WebViewPage({super.key, required this.url, required this.title, required this.feedSource});
+  const WebViewPage({
+    super.key,
+    required this.url,
+    required this.title,
+    required this.feedSource,
+  });
 
   @override
   State<WebViewPage> createState() => _WebViewPageState();
@@ -1353,10 +1579,17 @@ class _WebViewPageState extends State<WebViewPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.feedSource, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(
+              widget.feedSource,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             Text(
               widget.title,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF666666), fontWeight: FontWeight.normal),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF666666),
+                fontWeight: FontWeight.normal,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -1390,22 +1623,21 @@ class _WebViewPageState extends State<WebViewPage> {
             LinearProgressIndicator(
               value: _progress,
               backgroundColor: const Color(0xFF2A2A2A),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF9500)),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFFFF9500),
+              ),
             ),
           Expanded(
             child: InAppWebView(
               initialUrlRequest: URLRequest(url: WebUri(widget.url)),
               initialSettings: InAppWebViewSettings(
-                useOnLoadResource: false,
-                useShouldOverrideUrlLoading: false,
                 mediaPlaybackRequiresUserGesture: false,
                 allowsInlineMediaPlayback: true,
-                iframeAllow: "camera; microphone",
-                iframeAllowFullscreen: true,
-                // Disable console logging
                 javaScriptEnabled: true,
                 domStorageEnabled: true,
                 databaseEnabled: true,
+                cacheEnabled: true,
+                clearCache: false,
               ),
               onWebViewCreated: (controller) => _webViewController = controller,
               onProgressChanged: (controller, progress) {
@@ -1458,7 +1690,9 @@ class ImageViewerPage extends StatelessWidget {
         backgroundDecoration: const BoxDecoration(color: Colors.black),
         loadingBuilder: (context, event) => Center(
           child: CircularProgressIndicator(
-            value: event == null ? 0 : event.cumulativeBytesLoaded / (event.expectedTotalBytes ?? 1),
+            value: event == null
+                ? 0
+                : event.cumulativeBytesLoaded / (event.expectedTotalBytes ?? 1),
             color: const Color(0xFFFF9500),
           ),
         ),
@@ -1468,7 +1702,10 @@ class ImageViewerPage extends StatelessWidget {
             children: [
               Icon(Icons.error_outline, size: 48, color: Color(0xFF666666)),
               SizedBox(height: 16),
-              Text('Failed to load image', style: TextStyle(color: Color(0xFF666666))),
+              Text(
+                'Failed to load image',
+                style: TextStyle(color: Color(0xFF666666)),
+              ),
             ],
           ),
         ),
